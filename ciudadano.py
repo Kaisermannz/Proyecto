@@ -8,9 +8,7 @@ class Ciudadano:
         self.__apellido = apellido
         self.__comunidad = comunidad
         self.__enfermedad = enfermedad
-        self.__estado = (
-            False if enfermedad else True
-        )  # True para sano, False para enfermo/muerto
+        self.__estado = False if enfermedad else True  # True sano False enfermo/muerto
 
     def set_id(self, id):
         if isinstance(id, int):
