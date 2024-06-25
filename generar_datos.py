@@ -241,7 +241,7 @@ def generar_nombres():
         writer = csv.writer(file)
         writer.writerow(["id", "nombre", "apellido"])
 
-        for i in range(100):
+        for i in range(1000):
             writer.writerow(
                 [i, nombres[i % len(nombres)], apellidos[i % len(apellidos)]]
             )
