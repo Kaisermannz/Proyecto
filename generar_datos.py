@@ -1,8 +1,8 @@
 import csv
 from ciudadano import Ciudadano
+import random
 
-
-def generar_nombres():
+def generar_nombres(num):
     nombres = [
         "Juan",
         "Maria",
@@ -241,21 +241,56 @@ def generar_nombres():
         writer = csv.writer(file)
         writer.writerow(["id", "nombre", "apellido"])
 
-        for i in range(1000):
+        for i in range(num):
             writer.writerow(
                 [i, nombres[i % len(nombres)], apellidos[i % len(apellidos)]]
             )
 
 
-def cargar_ciudadanos(comunidad):
+def cargar_ciudadanos(comunidad, num_ciudadanos, num_infectados, enfermedad):
+    ciudadanos_cargados = 0
+    infectados_iniciales = 0
+    
     with open("datos/ciudadanos.csv", mode="r") as file:
         csv_reader = csv.DictReader(file)
         for row in csv_reader:
+            if ciudadanos_cargados >= num_ciudadanos:
+                break
+            
+            esta_enfermo = infectados_iniciales < num_infectados and random.random() < 0.5
+            
             ciudadano = Ciudadano(
-                id=row["id"],
+                id=int(row["id"]),
                 nombre=row["nombre"],
                 apellido=row["apellido"],
                 comunidad=comunidad,
-                enfermedad=None,  # Inicializar con una enfermedad después
+                enfermedad=enfermedad if esta_enfermo else None
             )
+            
+            if esta_enfermo:
+                ciudadano.set_enfermo(True)
+                infectados_iniciales += 1
+            
             comunidad.agregar_ciudadano(ciudadano)
+            ciudadanos_cargados += 1
+    
+    # Si no hay suficientes ciudadanos en el CSV, creamos más
+    while ciudadanos_cargados < num_ciudadanos:
+        esta_enfermo = infectados_iniciales < num_infectados and random.random() < 0.5
+        
+        ciudadano = Ciudadano(
+            id=ciudadanos_cargados + 1,
+            nombre=f"Ciudadano{ciudadanos_cargados + 1}",
+            apellido=f"Apellido{ciudadanos_cargados + 1}",
+            comunidad=comunidad,
+            enfermedad=enfermedad if esta_enfermo else None
+        )
+        
+        if esta_enfermo:
+            ciudadano.set_enfermo(True)
+            infectados_iniciales += 1
+        
+        comunidad.agregar_ciudadano(ciudadano)
+        ciudadanos_cargados += 1
+    
+    print(f"Se cargaron {ciudadanos_cargados} ciudadanos, de los cuales {infectados_iniciales} están inicialmente infectados.")
