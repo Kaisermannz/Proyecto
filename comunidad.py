@@ -16,7 +16,7 @@ class Comunidad:
 
     # Getters:
     def get_num_ciudadanos(self):
-        return self.__num_ciudadanos
+        return len(self.__ciudadanos)
 
     def get_promedio_conexion_fisica(self):
         return self.__promedio_conexion_fisica
@@ -51,4 +51,8 @@ class Comunidad:
 
     # Método para agregar ciudadano
     def agregar_ciudadano(self, ciudadano):
-        self.__ciudadanos.append(ciudadano)
+            if len(self.__ciudadanos) < self.__num_ciudadanos:
+                self.__ciudadanos.append(ciudadano)
+            else:
+                print("La comunidad ya está llena, no se pueden agregar más ciudadanos.")
+
