@@ -2,20 +2,30 @@ import csv
 import random
 import pandas as pd
 import os
-
+import numpy as np
 
 class Simulador:
-    def __init__(self, comunidad, output_dir="resultados"):
+    def __init__(self, comunidad, output_dir="resultados", beta=0.3, gamma=0.071):
         self.__comunidad = comunidad
         self.__dias_simulados = 0
-        self.__total_infectados = 0
-        self.__total_recuperados = 0
-        self.__historial = []
         self.__output_dir = output_dir
         if not os.path.exists(self.__output_dir):
             os.makedirs(self.__output_dir)
+        
+        # Atributos modelo SIR
+        self.__N = len(comunidad.get_ciudadanos())  # Población total
+        self.__beta = beta  # Tasa de infección
+        self.__gamma = gamma  # Tasa de recuperación
+        self.__dt = 1  # Paso de tiempo 1 día
 
-    # Getters y Setters (los mantenemos como estaban)
+        # Creamos valores como arrays de NumPy
+        self.__S = np.array(self.__N - comunidad.get_num_infectados(), dtype=float)
+        self.__I = np.array(comunidad.get_num_infectados(), dtype=float)
+        self.__R = np.array(0, dtype=float)
+        self.__total_infectados = np.array(comunidad.get_num_infectados(), dtype=float)
+        self.__total_recuperados = np.array(0, dtype=float)
+
+        self.__historial = []
 
     def ejecutar_simulacion(self, dias):
         for dia in range(dias):
@@ -25,97 +35,89 @@ class Simulador:
             self.__exportar_a_csv()
 
     def __simular_dia(self):
-        nuevos_infectados = 0
-        nuevos_recuperados = 0
-        for ciudadano in self.__comunidad.get_ciudadanos():
-            if ciudadano.get_enfermo():
-                nuevos_infectados += self.__propagar_enfermedad(ciudadano)
-            estado_anterior = ciudadano.get_enfermo()
-            self.__actualizar_estado(ciudadano)
-            if estado_anterior and not ciudadano.get_enfermo():
-                nuevos_recuperados += 1
+        
+        dSdt = -self.__beta * self.__S * self.__I / self.__N
+        dIdt = self.__beta * self.__S * self.__I / self.__N - self.__gamma * self.__I
+        dRdt = self.__gamma * self.__I
 
-        self.__total_infectados += nuevos_infectados
-        self.__total_recuperados += nuevos_recuperados
+        
+        new_S = self.__S + dSdt * self.__dt
+        new_I = self.__I + dIdt * self.__dt
+        new_R = self.__R + dRdt * self.__dt
 
-    def __propagar_enfermedad(self, ciudadano_enfermo):
-        nuevos_infectados = 0
-        contactos = self.__obtener_contactos(ciudadano_enfermo)
-        for contacto in contactos:
-            if (
-                not contacto.get_enfermo()
-                and random.random()
-                < self.__comunidad.get_enfermedad().get_infeccion_probable()
-            ):
-                contacto.set_enfermo(True)
-                nueva_enfermedad = Enfermedad(
-                    infeccion_probable=self.__comunidad.get_enfermedad().get_infeccion_probable(),
-                    promedio_pasos=self.__comunidad.get_enfermedad().get_promedio_pasos(),
-                )
-                contacto.set_enfermedad(nueva_enfermedad)
-                nueva_enfermedad.set_contador(0)
-                nuevos_infectados += 1
-        return nuevos_infectados
+        
+        new_S = np.maximum(0, new_S)
+        new_I = np.maximum(0, new_I)
+        new_R = np.maximum(0, new_R)
 
-    def __actualizar_estado(self, ciudadano):
-        if ciudadano.get_enfermo():
-            enfermedad = ciudadano.get_enfermedad()
-            if enfermedad is not None:
-                enfermedad.set_contador(enfermedad.get_contador() + 1)
-                if enfermedad.get_contador() >= enfermedad.get_promedio_pasos():
-                    ciudadano.set_enfermo(False)
-            else:
-                print(
-                    f"Advertencia: El ciudadano {ciudadano.get_id()} está enfermo pero no tiene una enfermedad asociada."
-                )
+        #  suma es igual a N
+        total = new_S + new_I + new_R
+        if total != self.__N:
+            factor = self.__N / total
+            new_S *= factor
+            new_I *= factor
+            new_R *= factor
 
-    def __obtener_contactos(self, ciudadano):
-        # Implementa la lógica para obtener los contactos de un ciudadano
-        # Esto dependerá de cómo hayas implementado las conexiones en tu modelo
-        return []  # Retorna una lista vacía por ahora
+        # Calculamos los cambios reales
+        delta_S = new_S - self.__S
+        delta_I = new_I - self.__I
+        delta_R = new_R - self.__R
+
+        # Actualizamos los valores
+        self.__S = new_S
+        self.__I = new_I
+        self.__R = new_R
+
+        # Actualizamos los contadores globales
+        self.__total_infectados += np.maximum(0, delta_I)
+        self.__total_recuperados += np.maximum(0, delta_R)
+
+        # Actualizamos el estado de los ciudadanos
+        ciudadanos = self.__comunidad.get_ciudadanos()
+        num_infectados = int(np.round(self.__I))
+        estados = np.zeros(self.__N, dtype=bool)
+        estados[:num_infectados] = True
+        np.random.shuffle(estados)
+        for ciudadano, estado in zip(ciudadanos, estados):
+            ciudadano.set_enfermo(estado)
+            if estado:
+                ciudadano.incrementar_dias_enfermo()
 
     def __generar_informe(self):
-        infectados_activos = sum(
-            1 for c in self.__comunidad.get_ciudadanos() if c.get_enfermo()
-        )
         informe = {
             "dia": self.__dias_simulados,
-            "infectados_activos": infectados_activos,
-            "total_infectados": self.__total_infectados,
-            "total_recuperados": self.__total_recuperados,
+            "susceptibles": int(np.round(self.__S)),
+            "infectados": int(np.round(self.__I)),
+            "recuperados": int(np.round(self.__R)),
+            "total_infectados": int(np.round(self.__total_infectados)),
+            "total_recuperados": int(np.round(self.__total_recuperados)),
         }
         self.__historial.append(informe)
         print(
-            f"Día {self.__dias_simulados}: Infectados activos: {infectados_activos}, "
-            f"Total infectados: {self.__total_infectados}, Recuperados: {self.__total_recuperados}"
+            f"Día {self.__dias_simulados}: Susceptibles: {informe['susceptibles']}, "
+            f"Infectados: {informe['infectados']}, Recuperados: {informe['recuperados']}, "
         )
 
     def __exportar_a_csv(self):
         nombre_archivo = os.path.join(
-            self.__output_dir, f"simulacion_dia_{self.__dias_simulados}.csv"
-        )
+            self.__output_dir, f"simulacion_dia_{self.__dias_simulados}.csv")
         datos = []
         for ciudadano in self.__comunidad.get_ciudadanos():
-            datos.append(
-                {
-                    "id": ciudadano.get_id(),
-                    "nombre": ciudadano.get_nombre(),
-                    "apellido": ciudadano.get_apellido(),
-                    "enfermo": ciudadano.get_enfermo(),
-                    "dias_enfermo": ciudadano.get_enfermedad().get_contador()
-                    if ciudadano.get_enfermo()
-                    else 0,
-                }
-            )
-
+            dato = {
+                "id": ciudadano.get_id(),
+                "nombre": ciudadano.get_nombre(),
+                "apellido": ciudadano.get_apellido(),
+                "enfermo": ciudadano.get_enfermo(),
+                "dias_enfermo": ciudadano.get_dias_enfermo() if ciudadano.get_enfermo() else 0,
+            }
+            datos.append(dato)
+            
         df = pd.DataFrame(datos)
+        
         df.to_csv(nombre_archivo, index=False)
-        print(f"Datos exportados a {nombre_archivo}")
 
     def obtener_estadisticas(self):
         return {
             "dias_simulados": self.__dias_simulados,
-            "total_infectados": self.__total_infectados,
-            "total_recuperados": self.__total_recuperados,
             "historial": self.__historial,
         }
