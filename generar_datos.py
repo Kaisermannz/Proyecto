@@ -1,6 +1,7 @@
 import csv
 from ciudadano import Ciudadano
 import random
+import os
 
 def generar_nombres(num):
     nombres = [
@@ -237,10 +238,11 @@ def generar_nombres(num):
         "Zuzen",
     ]
 
+    os.makedirs('datos', exist_ok=True)
+
     with open("datos/ciudadanos.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["id", "nombre", "apellido"])
-
         for i in range(num):
             writer.writerow(
                 [i, nombres[i % len(nombres)], apellidos[i % len(apellidos)]]
