@@ -117,7 +117,7 @@ class SimulacionCovidWindow(Gtk.ApplicationWindow):
         self.load_csv_data()
 
     def on_grafico(self, button):
-        image_path = "resultados/grafica_SIR.png"
+        image_path = "resultados_simulacion/grafica_SIR.png"
         if not os.path.exists(image_path):
             print(f"Error: La imagen {image_path} no existe.")
             return
@@ -139,7 +139,7 @@ class SimulacionCovidWindow(Gtk.ApplicationWindow):
 
     def load_csv_data(self):
         self.modelo.remove_all()
-        ruta_archivo = f"resultados/simulacion_dia_{self.dia_actual}.csv"
+        ruta_archivo = f"resultados_simulacion/simulacion_dia_{self.dia_actual}.csv"
         if os.path.exists(ruta_archivo):
             filas = []
             with open(ruta_archivo, 'r') as archivo_csv:
@@ -160,8 +160,8 @@ class SimulacionCovidWindow(Gtk.ApplicationWindow):
             print(f"No se encontró el archivo: {ruta_archivo}")
 
     def change_day(self, delta):
-        nuevo_dia = max(1, self.dia_actual + delta)
-        ruta_archivo = f"resultados/simulacion_dia_{nuevo_dia}.csv"
+        nuevo_dia = max(0, self.dia_actual + delta)
+        ruta_archivo = f"resultados_simulacion/simulacion_dia_{nuevo_dia}.csv"
         if os.path.exists(ruta_archivo):
             self.dia_actual = nuevo_dia
             self.load_csv_data()
